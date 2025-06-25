@@ -1,0 +1,69 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: eshop-dotnet-pipeline
+spec:
+  params:
+  - name: deployment-name
+    type: string
+    description: Deployment name
+    default: eshop-dotnet
+  - name: git-url
+    type: string
+    description: Git code repository
+    default: 'https://github.com/kevchu3/eShop-dotnet-tekton-pipeline.git'
+  - name: git-revision
+    type: string
+    description: Git revision to use
+    default: main
+  - name: IMAGE
+    type: string
+    description: Fully qualified image to be built
+    default: 'image-registry.openshift-image-registry.svc:5000/$(context.pipelineRun.namespace)/eshop-dotnet:latest'
+  workspaces:
+  - name: my-workspace
+  tasks:
+  - name: git-clone
+    taskRef:
+      resolver: cluster
+      params:
+      - name: kind
+        value: task
+      - name: name
+        value: git-clone
+      - name: namespace
+        value: openshift-pipelines
+    workspaces:
+    - name: output
+      workspace: my-workspace
+    params:
+    - name: URL
+      value: $(params.git-url)
+    - name: SUBDIRECTORY
+      value: ""
+    - name: DELETE_EXISTING
+      value: "true"
+    - name: REVISION
+      value: $(params.git-revision)
+  - name: build-image
+    taskRef:
+      resolver: cluster
+      params:
+      - name: kind
+        value: task
+      - name: name
+        value: buildah
+      - name: namespace
+        value: openshift-pipelines
+    workspaces:
+    - name: source
+      workspace: my-workspace
+    params:
+    - name: IMAGE
+      value: $(params.IMAGE)
+    - name: TLSVERIFY
+      value: 'true'
+    - name: DOCKERFILE
+      value: 'Containerfile'
+    runAfter:
+      - git-clone
