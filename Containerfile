@@ -1,10 +1,17 @@
 FROM registry.access.redhat.com/ubi8/dotnet-90:9.0 AS build
 
-ENV SSL_CERT_DIR=$HOME/.aspnet/dev-certs/trust:/etc/pki/tls/certs
+ENV SSL_CERT_DIR=$HOME/.aspnet/dev-certs/trust:/etc/pki/tls/certs \
+    ASPIRE_CONTAINER_RUNTIME=podman
 WORKDIR /opt/app-root/src
 
 USER root
-RUN microdnf install openssl -y
+# Use rootless podman to launch app processes
+RUN microdnf install openssl podman -y && \
+    usermod --add-subuids 100000-165535 default && \
+    usermod --add-subgids 100000-165535 default && \
+    setcap cap_setuid+eip /usr/bin/newuidmap && \
+    setcap cap_setgid+eip /usr/bin/newgidmap && \
+    chmod -R g=u /etc/subuid /etc/subgid
 
 USER 1001
 COPY --chown=1001:0 / /opt/app-root/src
